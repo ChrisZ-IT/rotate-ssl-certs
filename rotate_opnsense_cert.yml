@@ -28,7 +28,6 @@
       ansible.builtin.set_fact:
         tls_crt: "{{ (query('kubernetes.core.k8s', kind='Secret', namespace=k8s_namespace, resource_name=k8s_secret_name) | first).data['tls.crt'] }}"
         tls_key: "{{ (query('kubernetes.core.k8s', kind='Secret', namespace=k8s_namespace, resource_name=k8s_secret_name) | first).data['tls.key'] }}"
-      delegate_to: "{{ k8s_control_node }}"
       run_once: true
 
     - name: Get current list of certificates
