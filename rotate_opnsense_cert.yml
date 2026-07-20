@@ -25,9 +25,11 @@
   #   private: true
   tasks:
     - name: Fetch updated certificate data from Kubernetes
-      set_fact:
+      ansible.builtin.set_fact:
         tls_crt: "{{ (query('kubernetes.core.k8s', kind='Secret', namespace=k8s_namespace, resource_name=k8s_secret_name) | first).data['tls.crt'] }}"
         tls_key: "{{ (query('kubernetes.core.k8s', kind='Secret', namespace=k8s_namespace, resource_name=k8s_secret_name) | first).data['tls.key'] }}"
+      delegate_to: "{{ k8s_control_node }}"
+      run_once: true
 
     - name: Get current list of certificates
       ansible.builtin.uri:
@@ -38,6 +40,8 @@
         force_basic_auth: true
         validate_certs: true
       register: certs
+      delegate_to: localhost
+      run_once: true
 
     - name: Check if certificate already exists
       ansible.builtin.set_fact:
@@ -48,6 +52,8 @@
             | first
             | default({})
           }}
+      delegate_to: localhost
+      run_once: true
 
     - name: Update Existing SSL Cert if it was renewed
       ansible.builtin.uri:
@@ -76,6 +82,8 @@
       changed_when:
         existing_cert.crt != tls_crt or
         existing_cert.prv_payload != tls_key
+      delegate_to: localhost
+      run_once: true
 
     - name: Add SSL Cert if missing
       ansible.builtin.uri:
@@ -97,6 +105,10 @@
       register: cert_results
       when: not existing_cert
       changed_when: not existing_cert
+      delegate_to: localhost
+      run_once: true
 
     - debug:
         msg: "{{ cert_results }}"
+      delegate_to: localhost
+      run_once: true
