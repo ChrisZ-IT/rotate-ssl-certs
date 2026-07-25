@@ -39,7 +39,7 @@
         tls_key: "{{ k8s_secret_raw.resources[0].data['tls.key'] }}"
       run_once: true
 
-    - name: Get current list of opnsense certificates
+    - name: Get current list of certificates
       ansible.builtin.uri:
         url: "https://{{ opnsense_hostname }}/api/trust/cert/search"
         method: GET
@@ -119,4 +119,5 @@
     - debug:
         msg: "{{ cert_results }}"
       delegate_to: localhost
+      changed_when: cert_results.changed
       run_once: true
