@@ -25,90 +25,98 @@
   #   private: true
   tasks:
     - name: Fetch certificate data from Kubernetes
+      kubernetes.core.k8s_info:
+        kind: Secret
+        namespace: "{{ k8s_namespace }}"
+        name: "{{ k8s_secret_name }}"
+      register: k8s_secret_raw
+      delegate_to: "{{ k8s_control_node }}"
+      run_once: true
+
+    - name: Set certificate facts
       ansible.builtin.set_fact:
-        tls_crt: "{{ (query('kubernetes.core.k8s', kind='Secret', namespace=k8s_namespace, resource_name=k8s_secret_name) | first).data['tls.crt'] }}"
-        tls_key: "{{ (query('kubernetes.core.k8s', kind='Secret', namespace=k8s_namespace, resource_name=k8s_secret_name) | first).data['tls.key'] }}"
-      delegate_to: localhost
+        tls_crt: "{{ k8s_secret_raw.resources[0].data['tls.crt'] }}"
+        tls_key: "{{ k8s_secret_raw.resources[0].data['tls.key'] }}"
       run_once: true
 
-    - name: Get current list of certificates
-      ansible.builtin.uri:
-        url: "https://{{ opnsense_hostname }}/api/trust/cert/search"
-        method: GET
-        user: "{{ opnsense_key }}"
-        password: "{{ opnsense_secret }}"
-        force_basic_auth: true
-        validate_certs: true
-      register: certs
-      delegate_to: localhost
-      run_once: true
+    # - name: Get current list of certificates
+    #   ansible.builtin.uri:
+    #     url: "https://{{ opnsense_hostname }}/api/trust/cert/search"
+    #     method: GET
+    #     user: "{{ opnsense_key }}"
+    #     password: "{{ opnsense_secret }}"
+    #     force_basic_auth: true
+    #     validate_certs: true
+    #   register: certs
+    #   delegate_to: localhost
+    #   run_once: true
 
-    - name: Check if certificate already exists
-      ansible.builtin.set_fact:
-        existing_cert: >-
-          {{
-            certs.json.rows
-            | selectattr('descr', 'equalto', cert_description)
-            | first
-            | default({})
-          }}
-      delegate_to: localhost
-      run_once: true
+    # - name: Check if certificate already exists
+    #   ansible.builtin.set_fact:
+    #     existing_cert: >-
+    #       {{
+    #         certs.json.rows
+    #         | selectattr('descr', 'equalto', cert_description)
+    #         | first
+    #         | default({})
+    #       }}
+    #   delegate_to: localhost
+    #   run_once: true
 
-    - name: Update Existing SSL Cert if it was renewed
-      ansible.builtin.uri:
-        url: "https://{{ opnsense_hostname }}/api/trust/cert/set/{{ existing_cert.uuid }}"
-        method: POST
-        user: "{{ opnsense_key }}"
-        password: "{{ opnsense_secret }}"
-        force_basic_auth: true
-        validate_certs: false
-        body_format: json
-        body:
-          action: import
-          descr: "{{ cert_description }}"
-          cert_type: usr_cert
-          private_key_location: firewall
-          crt_payload: "{{ tls_crt | b64decode }}"
-          prv_payload: "{{ tls_key | b64decode }}"
-        return_content: true
-      register: cert_results
-      when:
-        existing_cert is defined and
-        existing_cert.crt is defined and
-        existing_cert.prv is defined and
-        (existing_cert.crt != tls_crt or
-        existing_cert.prv != tls_key)
-      changed_when:
-        existing_cert.crt != tls_crt or
-        existing_cert.prv_payload != tls_key
-      delegate_to: localhost
-      run_once: true
+    # - name: Update Existing SSL Cert if it was renewed
+    #   ansible.builtin.uri:
+    #     url: "https://{{ opnsense_hostname }}/api/trust/cert/set/{{ existing_cert.uuid }}"
+    #     method: POST
+    #     user: "{{ opnsense_key }}"
+    #     password: "{{ opnsense_secret }}"
+    #     force_basic_auth: true
+    #     validate_certs: false
+    #     body_format: json
+    #     body:
+    #       action: import
+    #       descr: "{{ cert_description }}"
+    #       cert_type: usr_cert
+    #       private_key_location: firewall
+    #       crt_payload: "{{ tls_crt | b64decode }}"
+    #       prv_payload: "{{ tls_key | b64decode }}"
+    #     return_content: true
+    #   register: cert_results
+    #   when:
+    #     existing_cert is defined and
+    #     existing_cert.crt is defined and
+    #     existing_cert.prv is defined and
+    #     (existing_cert.crt != tls_crt or
+    #     existing_cert.prv != tls_key)
+    #   changed_when:
+    #     existing_cert.crt != tls_crt or
+    #     existing_cert.prv_payload != tls_key
+    #   delegate_to: localhost
+    #   run_once: true
 
-    - name: Add SSL Cert if missing
-      ansible.builtin.uri:
-        url: "https://{{ opnsense_hostname }}/api/trust/cert/add"
-        method: POST
-        user: "{{ opnsense_key }}"
-        password: "{{ opnsense_secret }}"
-        force_basic_auth: true
-        validate_certs: false
-        body_format: json
-        body:
-          cert:
-            action: import
-            descr: "{{ cert_description }}"
-            private_key_location: firewall
-            crt_payload: "{{ tls_crt | b64decode }}"
-            prv_payload: "{{ tls_key | b64decode }}"
-        return_content: true
-      register: cert_results
-      when: not existing_cert
-      changed_when: not existing_cert
-      delegate_to: localhost
-      run_once: true
+    # - name: Add SSL Cert if missing
+    #   ansible.builtin.uri:
+    #     url: "https://{{ opnsense_hostname }}/api/trust/cert/add"
+    #     method: POST
+    #     user: "{{ opnsense_key }}"
+    #     password: "{{ opnsense_secret }}"
+    #     force_basic_auth: true
+    #     validate_certs: false
+    #     body_format: json
+    #     body:
+    #       cert:
+    #         action: import
+    #         descr: "{{ cert_description }}"
+    #         private_key_location: firewall
+    #         crt_payload: "{{ tls_crt | b64decode }}"
+    #         prv_payload: "{{ tls_key | b64decode }}"
+    #     return_content: true
+    #   register: cert_results
+    #   when: not existing_cert
+    #   changed_when: not existing_cert
+    #   delegate_to: localhost
+    #   run_once: true
 
     - debug:
-        msg: "{{ cert_results }}"
+        msg: "{{ tls_crt }}"
       delegate_to: localhost
       run_once: true
