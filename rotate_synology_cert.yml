@@ -1,5 +1,5 @@
 ---
-- name: Rotate Synology SSL Certs
+- name: Rotate synology SSL Certs
   hosts: all
   gather_facts: false
   # vars:
@@ -107,7 +107,7 @@
           run_once: true
           delegate_to: localhost
 
-        - name: Import Synology certificate
+        - name: Import synology certificate
           ansible.builtin.command:
             cmd: >
               curl -k "https://{{ synology_host }}:{{ synology_port }}/webapi/entry.cgi?api=SYNO.Core.Certificate&method=import&version=1"
