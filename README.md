@@ -31,8 +31,8 @@ Im using cert manager in my k8s cluster to renew the let's encrypt cert and then
 
 
 ### rotate_proxmox_cert.yml
- - proxmox_hostname: vmhost01
- - domain: doophq.net
+ - proxmox_hostname: <proxmox node name>
+ - domain: <domain name>
  - acme_account: <Datacenter \> ACME \> account name>
  - acme_plugin: <Datacenter \> ACME \> plugin name>
  - api_port: <Set via env var `PROXMOX_PORT`>
