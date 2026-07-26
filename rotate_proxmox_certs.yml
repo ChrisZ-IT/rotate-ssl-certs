@@ -1,0 +1,64 @@
+---
+- name: Rotate Proxmox SSL cert
+  hosts: localhost
+  gather_facts: false
+  # vars_prompt:
+  # - name: proxmox_hostname
+  #   prompt: Enter Proxmox node name
+  #   private: false
+  # - name: domain
+  #   prompt: Enter domain name for cert renewal
+  #   private: false
+  # - name: acme_account
+  #   prompt: Enter Datacenter > ACME > account name
+  #   private: false
+  #   default: letsencrypt-prod
+  # - name: acme_plugin
+  #   prompt: Enter Datacenter > ACME > plugin name
+  #   private: false
+  #   default: cloudflare
+  tasks:
+    - name: Get current SSL certs
+      community.proxmox.proxmox_acme_certificates_info:
+        node_name: "{{ proxmox_hostname }}"
+        api_host: "{{ proxmox_hostname }}"
+        validate_certs: false
+      register: current_certs
+
+    - name: Set current cert var
+      ansible.builtin.set_fact:
+        current_cert:
+          "{{
+            (
+            current_certs.certificates |
+            selectattr('issuer', '==', \"/C=US/O=Let's Encrypt/CN=YR1\") |
+            list |
+            first
+            ) | default({})
+          }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Get cert expiration date
+      ansible.builtin.set_fact:
+        cert_ep_date: "{{ '%Y-%m-%d %H:%M:%S' | strftime((current_cert.not_after | int - 2*86400)) }}"
+        current_date: "{{ '%Y-%m-%d %H:%M:%S' | strftime }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Certificate renewal
+      community.proxmox.proxmox_acme_certificate:
+        node_name: "{{ proxmox_hostname }}"
+        account: "{{ acme_account }}"
+        force: true
+        validate_certs: false
+        domains:
+          - domain: "{{ proxmox_hostname }}.{{ domain }}"
+            plugin: "{{ acme_plugin }}"
+      register: cert_status
+      when: cert_ep_date <= current_date
+
+    - name: Certificate renewal status
+      ansible.builtin.debug:
+        msg: "{{ cert_status }}"
+      when: cert_status is defined

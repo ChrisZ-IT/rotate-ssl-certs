@@ -28,3 +28,16 @@ Im using cert manager in my k8s cluster to renew the let's encrypt cert and then
  - synology_username: <synology api key>
  - synology_password <synology api secret>
  - cert_description: K8s Let's Encrypt Managed Cert
+
+
+### rotate_proxmox_cert.yml
+ - proxmox_hostname: vmhost01
+ - domain: doophq.net
+ - acme_account: <Datacenter \> ACME \> account name>
+ - acme_plugin: <Datacenter \> ACME \> plugin name>
+ - api_port: <Set via env var `PROXMOX_PORT`>
+ - api_token_id: <Set via env var `PROXMOX_TOKEN_ID`>
+ - api_token_secret(use this if token_password is not set): <Set via env var `PROXMOX_TOKEN_SECRET`>
+ - api_password(use this if token_secret is not set): <Set via env var `PROXMOX_PASSWORD`>
+
+    I just manually setup the initial ACME accounts/pugins/certs in proxmox since its a 1 time thing. This playbook then renews the cert when it expires. I will create another playbook for the config as code setup of these parts in the future.
