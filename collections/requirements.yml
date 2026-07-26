@@ -3,3 +3,6 @@ collections:
   - name: kubernetes.core
     version: 6.5.0
     source: https://galaxy.ansible.com
+  - name: community.crypto
+    version: 3.3.0
+    source: https://galaxy.ansible.com

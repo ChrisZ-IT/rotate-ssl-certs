@@ -1,0 +1,157 @@
+---
+- name: Rotate synology SSL Certs
+  hosts: all
+  gather_facts: false
+  # vars:
+  #   cert_description: K8s Let's Encrypt Managed Cert
+  #   synology_port: 8443
+  # vars_prompt:
+  # - name: k8s_control_node
+  #   prompt: Enter your k8s control node hostname
+  #   private: false
+  # - name: k8s_secret_name
+  #   prompt: Enter name of k8s secret
+  #   private: false
+  # - name: k8s_namespace
+  #   prompt: Enter k8s name space
+  #   private: false
+  # - name: synology_hostname
+  #   prompt: Enter hostname or ip of synology host
+  #   private: false
+  # - name: synology_username
+  #   prompt: Enter your synology username
+  #   private: false
+  # - name: synology_password
+  #   prompt: Enter your synology password
+  #   private: true
+  tasks:
+    - name: Fetch certificate data from Kubernetes
+      kubernetes.core.k8s_info:
+        kind: Secret
+        namespace: "{{ k8s_namespace }}"
+        name: "{{ k8s_secret_name }}"
+      register: k8s_secret_raw
+      delegate_to: "{{ k8s_control_node }}"
+      run_once: true
+
+    - name: Set certificate facts
+      ansible.builtin.set_fact:
+        tls_crt: "{{ k8s_secret_raw.resources[0].data['tls.crt'] }}"
+        tls_key: "{{ k8s_secret_raw.resources[0].data['tls.key'] }}"
+      run_once: true
+
+    - name: Get the cert from an RDP port
+      community.crypto.get_certificate:
+        host: "{{ synology_hostname }}"
+        port: "{{ synology_port }}"
+        get_certificate_chain: true
+      delegate_to: localhost
+      run_once: true
+      register: cert
+
+    - name: Extract current cert data
+      ansible.builtin.set_fact:
+        sn_cert: "{{ cert.unverified_chain | join | b64encode }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: Update synology cert
+      block:
+        - name: Create cert file
+          ansible.builtin.copy:
+            content: "{{ tls_crt | b64decode }}"
+            dest: server.crt
+          run_once: true
+          delegate_to: localhost
+
+        - name: Create pem file
+          ansible.builtin.copy:
+            content: "{{ tls_key | b64decode }}"
+            dest: server.key
+          run_once: true
+          delegate_to: localhost
+
+        - name: Authenticate to synology
+          ansible.builtin.uri:
+            url: "https://{{ synology_host }}:{{ synology_port }}/webapi/auth.cgi?api=SYNO.API.Auth&version=7&method=login&account={{ synology_username }}&passwd={{ synology_pass }}"
+            method: GET
+            return_content: true
+          run_once: true
+          delegate_to: localhost
+          register: login
+
+        - name: Gather Current Certs
+          ansible.builtin.uri:
+            url: "https://{{ synology_host }}:{{ synology_port }}/webapi/entry.cgi?api=SYNO.Core.Certificate.CRT&version=1&method=list"
+            method: GET
+            return_content: true
+            headers:
+              content_type: application/json
+              Cookie: "{{ login.cookies_string }}"
+          register: list_certs
+          run_once: true
+          delegate_to: localhost
+
+        - name: Set current cert var
+          ansible.builtin.set_fact:
+            current_cert:
+              "{{
+                (
+                list_certs.json.data.certificates |
+                selectattr('issuer.organization', 'equalto', \"Let's Encrypt\") |
+                selectattr('is_default', 'equalto', true) |
+                list |
+                first
+                ) | default({})
+              }}"
+          run_once: true
+          delegate_to: localhost
+
+        - name: Import synology certificate
+          ansible.builtin.command:
+            cmd: >
+              curl -k "https://{{ synology_host }}:{{ synology_port }}/webapi/entry.cgi?api=SYNO.Core.Certificate&method=import&version=1"
+              -b "{{ login.cookies_string }}"
+              -X POST
+              -F "key=@{{ playbook_dir }}/server.key;type=application/x-x509-ca-cert"
+              -F "cert=@{{ playbook_dir }}/server.crt;type=application/x-x509-ca-cert"
+              -F "inter_cert=''"
+              -F "id={{ current_cert.id | default('') }}"
+              -F "desc={{ cert_description }}"
+              -F "as_default=true"
+          register: uri_result
+          delegate_to: localhost
+          run_once: true
+
+        - name: Debug testing
+          ansible.builtin.debug:
+            msg: "{{ uri_result.stdout }}"
+          run_once: true
+          delegate_to: localhost
+          when: uri_result is defined
+
+        - name: Remove temp cert file
+          ansible.builtin.file:
+            path: "{{ playbook_dir }}/server.crt"
+            state: absent
+          run_once: true
+          delegate_to: localhost
+
+        - name: Create pem file
+          ansible.builtin.file:
+            path: "{{ playbook_dir }}/server.key"
+            state: absent
+          run_once: true
+          delegate_to: localhost
+
+        - name: Logout of the synology
+          ansible.builtin.uri:
+            url: "https://{{ synology_host }}:{{ synology_port }}/webapi/auth.cgi?api=SYNO.API.Auth&version=7&method=logout"
+            method: GET
+            headers:
+              Cookie: "{{ login.cookies_string }}"
+            return_content: true
+          run_once: true
+          delegate_to: localhost
+          register: login
+      when: sn_cert != tls_crt

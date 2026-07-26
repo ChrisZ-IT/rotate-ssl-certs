@@ -21,9 +21,10 @@ Im using cert manager in my k8s cluster to renew the let's encrypt cert and then
 
 ### rotate_synology_cert.yml
  - k8s_control_node: <Hostname of your k8s control node>
- - k8s_secret_name: <name of the k8s secret that stores your opnsense cert>
+ - k8s_secret_name: <name of the k8s secret that stores your synology cert>
  - k8s_namespace: <namespace this secret is stored in>
- - synology_hostname: <opnsense hostname/ip>
- - synology_key: <opnsense api key>
- - synology_secret <opnsense api secret>
+ - synology_hostname: <synology hostname/ip>
+ - synology_port: <Port DSM run on>
+ - synology_username: <synology api key>
+ - synology_password <synology api secret>
  - cert_description: K8s Let's Encrypt Managed Cert
