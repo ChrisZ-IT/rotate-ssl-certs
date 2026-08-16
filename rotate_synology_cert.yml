@@ -73,7 +73,7 @@
 
         - name: Authenticate to synology
           ansible.builtin.uri:
-            url: "https://{{ synology_host }}:{{ synology_port }}/webapi/auth.cgi?api=SYNO.API.Auth&version=7&method=login&account={{ synology_username }}&passwd={{ synology_pass }}"
+            url: "https://{{ synology_hostname }}:{{ synology_port }}/webapi/auth.cgi?api=SYNO.API.Auth&version=7&method=login&account={{ synology_username }}&passwd={{ synology_pass }}"
             method: GET
             return_content: true
           run_once: true
@@ -82,7 +82,7 @@
 
         - name: Gather Current Certs
           ansible.builtin.uri:
-            url: "https://{{ synology_host }}:{{ synology_port }}/webapi/entry.cgi?api=SYNO.Core.Certificate.CRT&version=1&method=list"
+            url: "https://{{ synology_hostname }}:{{ synology_port }}/webapi/entry.cgi?api=SYNO.Core.Certificate.CRT&version=1&method=list"
             method: GET
             return_content: true
             headers:
@@ -110,7 +110,7 @@
         - name: Import synology certificate
           ansible.builtin.command:
             cmd: >
-              curl -k "https://{{ synology_host }}:{{ synology_port }}/webapi/entry.cgi?api=SYNO.Core.Certificate&method=import&version=1"
+              curl -k "https://{{ synology_hostname }}:{{ synology_port }}/webapi/entry.cgi?api=SYNO.Core.Certificate&method=import&version=1"
               -b "{{ login.cookies_string }}"
               -X POST
               -F "key=@{{ playbook_dir }}/server.key;type=application/x-x509-ca-cert"
@@ -146,7 +146,7 @@
 
         - name: Logout of the synology
           ansible.builtin.uri:
-            url: "https://{{ synology_host }}:{{ synology_port }}/webapi/auth.cgi?api=SYNO.API.Auth&version=7&method=logout"
+            url: "https://{{ synology_hostname }}:{{ synology_port }}/webapi/auth.cgi?api=SYNO.API.Auth&version=7&method=logout"
             method: GET
             headers:
               Cookie: "{{ login.cookies_string }}"
