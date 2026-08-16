@@ -73,7 +73,7 @@
 
         - name: Authenticate to synology
           ansible.builtin.uri:
-            url: "https://{{ synology_hostname }}:{{ synology_port }}/webapi/auth.cgi?api=SYNO.API.Auth&version=7&method=login&account={{ synology_username }}&passwd={{ synology_pass }}"
+            url: "https://{{ synology_hostname }}:{{ synology_port }}/webapi/auth.cgi?api=SYNO.API.Auth&version=7&method=login&account={{ synology_username }}&passwd={{ synology_password}}"
             method: GET
             return_content: true
           run_once: true
