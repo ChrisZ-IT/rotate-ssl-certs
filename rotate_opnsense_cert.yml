@@ -1,25 +1,25 @@
 ---
 - name: Rotate https cert on opnsense routers
-  hosts: all
+  hosts: localhost
   gather_facts: false
-  # vars:
-  #   cert_description: K8s Let's Encrypt Managed Cert
+  vars:
+    cert_description: K8s Let's Encrypt Managed Cert
   # vars_prompt:
   # - name: k8s_control_node
   #   prompt: Enter your k8s control node hostname
   #   private: false
   # - name: k8s_secret_name
-  #   prompt: Enter name of k8s secret
+  #   prompt: Enter name of cert request k8s secret
   #   private: false
-  # - name: k8s_secret_name
-  #   prompt: Enter name of k8s secret
+  # - name: k8s_namespace
+  #   prompt: Enter K8s namespace secret is stored in
   #   private: false
   # - name: opnsense_hostname
   #   prompt: Enter hostname or ip of opnsense host
-  #   private: true
+  #   private: false
   # - name: opnsense_key
   #   prompt: Enter your opnsense api key
-  #   private: true
+  #   private: false
   # - name: opnsense_secret
   #   prompt: Enter your opnsense api secret
   #   private: true
@@ -46,7 +46,7 @@
         user: "{{ opnsense_key }}"
         password: "{{ opnsense_secret }}"
         force_basic_auth: true
-        validate_certs: true
+        validate_certs: false
       register: certs
       delegate_to: localhost
       run_once: true
@@ -70,15 +70,16 @@
         user: "{{ opnsense_key }}"
         password: "{{ opnsense_secret }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: true
         body_format: json
         body:
-          action: import
-          descr: "{{ cert_description }}"
-          cert_type: usr_cert
-          private_key_location: firewall
-          crt_payload: "{{ tls_crt | b64decode }}"
-          prv_payload: "{{ tls_key | b64decode }}"
+          cert:
+            action: import
+            descr: "{{ cert_description }}"
+            cert_type: usr_cert
+            private_key_location: firewall
+            crt_payload: "{{ tls_crt | b64decode }}"
+            prv_payload: "{{ tls_key | b64decode }}"
         return_content: true
       register: cert_results
       when:
@@ -92,6 +93,7 @@
         existing_cert.prv_payload != tls_key
       delegate_to: localhost
       run_once: true
+      notify: Restart webgui
 
     - name: Add SSL Cert if missing
       ansible.builtin.uri:
@@ -115,9 +117,23 @@
       changed_when: not existing_cert
       delegate_to: localhost
       run_once: true
+      notify: Restart webgui
 
     - debug:
         msg: "{{ cert_results }}"
       delegate_to: localhost
       changed_when: cert_results.changed
+      run_once: true
+
+  handlers:
+    - name: Restart webgui
+      ansible.builtin.uri:
+        url: "https://{{ opnsense_hostname }}/api/core/service/restart/webgui"
+        method: POST
+        user: "{{ opnsense_key }}"
+        password: "{{ opnsense_secret }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: -1
+      delegate_to: localhost
       run_once: true
