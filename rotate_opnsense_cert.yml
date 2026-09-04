@@ -1,6 +1,6 @@
 ---
 - name: Rotate https cert on opnsense routers
-  hosts: localhost
+  hosts: all
   gather_facts: false
   vars:
     cert_description: K8s Let's Encrypt Managed Cert
