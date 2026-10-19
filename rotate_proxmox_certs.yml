@@ -31,7 +31,7 @@
           "{{
             (
             current_certs.certificates |
-            selectattr('issuer', '==', \"/C=US/O=Let's Encrypt/CN=YR1\") |
+            selectattr('issuer', 'search', \"Let's Encrypt\") |
             list |
             first
             ) | default({})
