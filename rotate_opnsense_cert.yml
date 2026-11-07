@@ -35,8 +35,16 @@
 
     - name: Set certificate facts
       ansible.builtin.set_fact:
-        tls_crt: "{{ k8s_secret_raw.resources[0].data['tls.crt'] }}"
-        tls_key: "{{ k8s_secret_raw.resources[0].data['tls.key'] }}"
+        web_crt: "{{ cert_list[0] | b64encode }}"
+        web_key: "{{ k8s_secret_raw.resources[0].data['tls.key'] }}"
+      vars:
+        cert_list: >-
+          {{
+            (k8s_secret_raw.resources[0].data['tls.crt'] | b64decode)
+            .split('-----BEGIN CERTIFICATE-----')[1:]
+            | map('regex_replace', '^', '-----BEGIN CERTIFICATE-----')
+            | list
+          }}
       run_once: true
 
     - name: Get current list of certificates from opnsense
@@ -78,19 +86,19 @@
             descr: "{{ cert_description }}"
             cert_type: usr_cert
             private_key_location: firewall
-            crt_payload: "{{ tls_crt | b64decode }}"
-            prv_payload: "{{ tls_key | b64decode }}"
+            crt_payload: "{{ web_crt | b64decode }}"
+            prv_payload: "{{ web_key | b64decode }}"
         return_content: true
       register: cert_results
       when:
         existing_cert is defined and
         existing_cert.crt is defined and
         existing_cert.prv is defined and
-        (existing_cert.crt != tls_crt or
-        existing_cert.prv != tls_key)
+        (existing_cert.crt != web_crt or
+        existing_cert.prv != web_key)
       changed_when:
-        existing_cert.crt != tls_crt or
-        existing_cert.prv_payload != tls_key
+        existing_cert.crt != web_crt or
+        existing_cert.prv_payload != web_key
       delegate_to: localhost
       run_once: true
       notify: Restart webgui
@@ -109,8 +117,8 @@
             action: import
             descr: "{{ cert_description }}"
             private_key_location: firewall
-            crt_payload: "{{ tls_crt | b64decode }}"
-            prv_payload: "{{ tls_key | b64decode }}"
+            crt_payload: "{{ web_crt | b64decode }}"
+            prv_payload: "{{ web_key | b64decode }}"
         return_content: true
       register: cert_results
       when: not existing_cert
